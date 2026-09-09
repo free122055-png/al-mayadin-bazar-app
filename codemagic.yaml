@@ -5,7 +5,7 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       node: 20
-      java: 17
+      java: 21
     scripts:
       - name: Install dependencies
         script: |
@@ -23,6 +23,9 @@ workflows:
       - name: Build Android AAB (Google Play Bundle)
         script: |
           cd android
+          echo "Using Java version:"
+          java -version
+          javac -version
           chmod +x gradlew
           ./gradlew bundleRelease --no-daemon
       - name: Sign Android App Bundle (AAB)
