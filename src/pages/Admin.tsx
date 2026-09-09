@@ -48,7 +48,7 @@ OVKwXvSuAXa961yvmxhloAvVNj3PHewurSsi+j//+6+EtA9G5LJmj+1BBhxglwOk
 export const Admin: React.FC = () => {
   // Navigation Menu State
   const [activeMenu, setActiveMenu] = useState<
-    "all-products" | "add-product" | "banner-management" | "delivery-settings" | "delivery-management" | "orders" | "food-subcategories" | "category-icons" | "main-banners" | "integration-center" | "user-management" | "onesignal"
+    "all-products" | "add-product" | "banner-management" | "delivery-settings" | "delivery-management" | "orders" | "food-subcategories" | "category-icons" | "main-banners" | "integration-center" | "user-management" | "onesignal" | "signing-keystore"
   >("all-products");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedUserForNotification, setSelectedUserForNotification] = useState<any>(null);
@@ -112,6 +112,59 @@ export const Admin: React.FC = () => {
   const handleCopyCertInMemory = () => {
     navigator.clipboard.writeText(CERT_TEXT);
     showToast("আসল সার্টিফিকেট টেক্সট কপি হয়েছে!");
+  };
+
+  const handleDownloadKeystoreFromMemory = async () => {
+    try {
+      const res = await fetch("/public/keystore_b64.txt");
+      let b64 = "";
+      if (res.ok) {
+        b64 = (await res.text()).trim();
+      }
+      if (b64) {
+        const byteCharacters = atob(b64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "release.keystore";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("✓ release.keystore ডাউনলোড সম্পন্ন হয়েছে!");
+        return;
+      }
+    } catch (err) {
+      console.warn("Client fallback to direct link", err);
+    }
+    const a = document.createElement("a");
+    a.href = "/api/download-keystore";
+    a.download = "release.keystore";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast("✓ release.keystore ডাউনলোড শুরু হয়েছে!");
+  };
+
+  const handleCopyKeystoreBase64 = async () => {
+    try {
+      const res = await fetch("/public/keystore_b64.txt");
+      if (res.ok) {
+        const b64 = (await res.text()).trim();
+        await navigator.clipboard.writeText(b64);
+        showToast("✓ release.keystore-এর Base64 টেক্সট ক্লিপবোর্ডে কপি হয়েছে (CM_KEYSTORE এর জন্য)!");
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    showToast("কপি করা যায়নি, দয়া করে ফাইলটি ডাউনলোড করুন।", true);
   };
 
   // Calculate final discounted sale price automatically
@@ -256,6 +309,17 @@ export const Admin: React.FC = () => {
             <span className="hidden sm:inline">হোম পেইজ</span>
           </a>
 
+          {/* Quick 1-click Download release.keystore in Admin Header */}
+          <button
+            onClick={handleDownloadKeystoreFromMemory}
+            title="Android release.keystore ডাউনলোড করুন"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-gray-950 font-black text-xs rounded-xl shadow-md transition cursor-pointer"
+          >
+            <KeyRound className="w-4 h-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">release.keystore ডাউনলোড</span>
+            <span className="sm:hidden">.keystore</span>
+          </button>
+
           {/* Quick 1-click In-Memory Download .PEM file in Admin Header */}
           <button
             onClick={handleDownloadCertInMemory}
@@ -285,6 +349,7 @@ export const Admin: React.FC = () => {
         <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 flex items-center gap-1.5 min-w-max">
           {[
             { id: "all-products", label: "সকল প্রোডাক্ট", icon: Package },
+            { id: "signing-keystore", label: "🔑 সাইনিং কি (.keystore)", icon: KeyRound },
             { id: "add-product", label: "নতুন প্রোডাক্ট যোগ", icon: PackagePlus },
             { id: "orders", label: "অর্ডারসমূহ", icon: ClipboardList },
             { id: "user-management", label: "ইউজার", icon: Users },
@@ -365,6 +430,15 @@ export const Admin: React.FC = () => {
                   active={activeMenu === "all-products"}
                   onClick={() => {
                     setActiveMenu("all-products");
+                    setIsDrawerOpen(false);
+                  }}
+                />
+                <MenuButton
+                  icon={<KeyRound className="text-amber-500" />}
+                  label="🔑 সাইনিং কি-স্টোর (.keystore)"
+                  active={activeMenu === "signing-keystore"}
+                  onClick={() => {
+                    setActiveMenu("signing-keystore");
                     setIsDrawerOpen(false);
                   }}
                 />
@@ -503,8 +577,8 @@ export const Admin: React.FC = () => {
       </AnimatePresence>
 
       {/* Prominent Direct Android Signing Keystore & Certificate Download Banner in Admin Dashboard */}
-      <div className="w-full max-w-5xl px-4 pt-4 pb-2">
-        <div className="bg-gradient-to-r from-[#032517] via-[#053d26] to-[#042819] border-2 border-emerald-500/60 rounded-2xl p-4 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 pt-3 pb-2">
+        <div className="bg-gradient-to-r from-[#032517] via-[#053d26] to-[#042819] border-2 border-emerald-500/60 rounded-2xl p-3 sm:p-4 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3.5 w-full md:w-auto">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-400/30 shadow-inner">
               <KeyRound className="w-6 h-6" />
@@ -519,35 +593,36 @@ export const Admin: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-emerald-200/90 mt-0.5">
-                Codemagic AAB সাইন করার আসল সাইনিং কি (Alias: <code className="text-amber-300">almayadin</code>, Pass: <code className="text-amber-300">almayadin123</code>)
+                Codemagic AAB সাইন করার আসল কি (Alias: <code className="text-amber-300 font-mono">almayadin</code> | Pass: <code className="text-amber-300 font-mono">almayadin123</code>)
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto shrink-0">
-            <a
-              href="/api/download-keystore"
-              download="release.keystore"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-gray-950 font-black text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto shrink-0">
+            <button
+              onClick={handleDownloadKeystoreFromMemory}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-400 hover:bg-amber-300 active:scale-95 text-gray-950 font-black text-xs sm:text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
             >
               <Download className="w-4 h-4 stroke-[2.5]" />
-              <span>ডাউনলোড release.keystore</span>
-            </a>
-            <button
-              onClick={handleDownloadCertInMemory}
-              className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-2 transition cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>.PEM ফাইল</span>
+              <span>ডাউনলোড .keystore</span>
             </button>
-            <Link
-              to="/download-cert"
-              className="w-full sm:w-auto px-3 py-2.5 bg-white/15 hover:bg-white/25 active:scale-95 text-white font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 border border-white/20 transition cursor-pointer"
+            <button
+              onClick={handleCopyKeystoreBase64}
+              className="flex-1 sm:flex-none px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
-              <span>বিস্তারিত পেইজ</span>
-            </Link>
+              <Copy className="w-3.5 h-3.5" />
+              <span>Base64 কপি</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveMenu("signing-keystore");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="w-full sm:w-auto px-3.5 py-2.5 bg-white/15 hover:bg-white/25 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-white/20 transition cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+              <span>সম্পূর্ণ তথ্য ও গাইড</span>
+            </button>
           </div>
         </div>
       </div>
@@ -557,6 +632,232 @@ export const Admin: React.FC = () => {
         {/* VIEW 1: ALL PRODUCTS MANAGEMENT (VIEW, EDIT, DELETE) */}
         {activeMenu === "all-products" ? (
           <ProductManagement onNavigateToAddProduct={() => setActiveMenu("add-product")} />
+        ) : activeMenu === "signing-keystore" ? (
+          /* VIEW: ANDROID SIGNING KEYSTORE MANAGEMENT & DOWNLOAD */
+          <div className="w-full max-w-4xl px-2 sm:px-4 py-4 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-gray-900 flex items-center gap-2.5">
+                  <span className="p-2 bg-amber-100 text-amber-700 rounded-xl">
+                    <KeyRound className="w-6 h-6" />
+                  </span>
+                  অ্যান্ড্রয়েড রিলিজ সাইনিং কি-স্টোর
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                  Google Play Store এবং Codemagic-এ রিলিজ AAB সাইন করার আসল কি-স্টোর ফাইল ও ক্রেডেনশিয়াল
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveMenu("all-products")}
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl active:scale-95 transition flex items-center gap-1"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>ফিরে যান</span>
+              </button>
+            </div>
+
+            {/* Main Action Card */}
+            <div className="bg-white rounded-2xl border-2 border-emerald-500/40 p-5 sm:p-6 shadow-md">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-5 border-b border-gray-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
+                      ✓ মূল কি-স্টোর সংরক্ষিত
+                    </span>
+                    <span className="text-xs text-gray-500 font-mono">2,758 Bytes (PKCS12)</span>
+                  </div>
+                  <h3 className="text-lg font-black text-gray-900 mt-1 font-mono">
+                    release.keystore
+                  </h3>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    এই ফাইলটি দিয়ে আপনার অ্যাপের প্রতিটি সংস্করণ গুগল প্লে-র জন্য সাইন করা হয়।
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                  <button
+                    onClick={handleDownloadKeystoreFromMemory}
+                    className="flex-1 sm:flex-none px-5 py-3 bg-amber-400 hover:bg-amber-300 text-gray-950 font-black text-sm rounded-xl shadow-md active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-5 h-5 stroke-[2.5]" />
+                    <span>release.keystore ডাউনলোড</span>
+                  </button>
+
+                  <a
+                    href="/api/download-keystore"
+                    download="release.keystore"
+                    className="px-3.5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl active:scale-95 transition flex items-center justify-center gap-1 cursor-pointer"
+                    title="ডাইরেক্ট সার্ভার লিংক"
+                  >
+                    <span>ডাইরেক্ট লিংক</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Codemagic Environment Variables Table with 1-click Copy */}
+              <div className="mt-5 space-y-3">
+                <h4 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-emerald-600" />
+                  Codemagic Secure Environment Variables (কপি করে বসান):
+                </h4>
+
+                <div className="grid grid-cols-1 gap-2.5">
+                  {/* CM_KEYSTORE Base64 */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          CM_KEYSTORE
+                        </span>
+                        <span className="text-[11px] text-gray-500">Base64 Encoded Keystore Data</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1 font-mono text-ellipsis overflow-hidden">
+                        3,680 অক্ষরবিশিষ্ট সম্পূর্ণ Base64 স্ট্রিং
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleCopyKeystoreBase64}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg active:scale-95 transition flex items-center gap-1.5 shrink-0"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Base64 কপি করুন</span>
+                    </button>
+                  </div>
+
+                  {/* CM_KEY_ALIAS */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          CM_KEY_ALIAS
+                        </span>
+                        <span className="text-[11px] text-gray-500">Key Alias Name</span>
+                      </div>
+                      <p className="text-xs text-gray-800 mt-1 font-mono font-bold">
+                        almayadin
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText("almayadin");
+                        showToast("✓ CM_KEY_ALIAS ('almayadin') কপি হয়েছে!");
+                      }}
+                      className="px-3.5 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-lg active:scale-95 transition flex items-center gap-1.5 shrink-0"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>কপি করুন</span>
+                    </button>
+                  </div>
+
+                  {/* CM_KEYSTORE_PASSWORD */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          CM_KEYSTORE_PASSWORD
+                        </span>
+                        <span className="text-[11px] text-gray-500">Keystore Password</span>
+                      </div>
+                      <p className="text-xs text-gray-800 mt-1 font-mono font-bold">
+                        almayadin123
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText("almayadin123");
+                        showToast("✓ CM_KEYSTORE_PASSWORD ('almayadin123') কপি হয়েছে!");
+                      }}
+                      className="px-3.5 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-lg active:scale-95 transition flex items-center gap-1.5 shrink-0"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>কপি করুন</span>
+                    </button>
+                  </div>
+
+                  {/* CM_KEY_PASSWORD */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                          CM_KEY_PASSWORD
+                        </span>
+                        <span className="text-[11px] text-gray-500">Key Password (ঐচ্ছিক)</span>
+                      </div>
+                      <p className="text-xs text-gray-800 mt-1 font-mono font-bold">
+                        almayadin123
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText("almayadin123");
+                        showToast("✓ CM_KEY_PASSWORD ('almayadin123') কপি হয়েছে!");
+                      }}
+                      className="px-3.5 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-lg active:scale-95 transition flex items-center gap-1.5 shrink-0"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>কপি করুন</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Instructions & Help */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Option 1: Upload File */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <h4 className="font-black text-gray-900 text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-xs flex items-center justify-center font-bold">১</span>
+                  Codemagic-এ সরাসরি ফাইল আপলোড:
+                </h4>
+                <ol className="text-xs text-gray-600 mt-3 space-y-2 list-decimal list-inside">
+                  <li>উপরের <strong className="text-gray-900">"release.keystore ডাউনলোড"</strong> বাটনে ক্লিক করে ফাইলটি সংরক্ষণ করুন।</li>
+                  <li>Codemagic ড্যাশবোর্ডে গিয়ে <strong className="text-gray-900">Code signing</strong> সেকশনে যান।</li>
+                  <li><strong className="text-gray-900">release.keystore</strong> ফাইলটি আপলোড করুন।</li>
+                  <li>Password: <code className="bg-gray-100 px-1 py-0.5 rounded text-amber-700 font-bold font-mono">almayadin123</code> এবং Alias: <code className="bg-gray-100 px-1 py-0.5 rounded text-blue-700 font-bold font-mono">almayadin</code> দিন।</li>
+                </ol>
+              </div>
+
+              {/* Option 2: Base64 Variable */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <h4 className="font-black text-gray-900 text-sm flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 text-xs flex items-center justify-center font-bold">২</span>
+                  Environment Variables এ Base64 যোগ:
+                </h4>
+                <ol className="text-xs text-gray-600 mt-3 space-y-2 list-decimal list-inside">
+                  <li><strong className="text-emerald-700">"Base64 কপি করুন"</strong> বাটনে ক্লিক করুন।</li>
+                  <li>Codemagic-এর <strong className="text-gray-900">Environment variables</strong> ট্যাবে যান।</li>
+                  <li>Variable: <code className="bg-gray-100 px-1 py-0.5 rounded font-bold font-mono">CM_KEYSTORE</code> এবং Value ঘরে পেস্ট করুন।</li>
+                  <li><strong className="text-gray-900">Secure</strong> চেকবক্সে টিক দিয়ে সেভ করে নতুন বিল্ড দিন।</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* Other Cert Files */}
+            <div className="bg-gray-100/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Google Play Console আপলোড সার্টিফিকেটের প্রয়োজন হলে .PEM ডাউনলোড করুন</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadCertInMemory}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-bold transition flex items-center gap-1 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>.PEM সার্টিফিকেট</span>
+                </button>
+                <a
+                  href="/download-keystore.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-bold transition flex items-center gap-1 cursor-pointer"
+                >
+                  <span>আলাদা পেজ</span>
+                </a>
+              </div>
+            </div>
+          </div>
         ) : activeMenu === "banner-management" ? (
           /* VIEW 2: BANNER MANAGEMENT */
           <BannerManagement />

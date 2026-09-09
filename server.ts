@@ -179,6 +179,17 @@ async function startServer() {
     if (!fs.existsSync(keystorePath)) {
       keystorePath = path.join(process.cwd(), "public", "release.keystore");
     }
+    if (!fs.existsSync(keystorePath)) {
+      const b64Path = path.join(process.cwd(), "public", "keystore_b64.txt");
+      if (fs.existsSync(b64Path)) {
+        try {
+          const b64 = fs.readFileSync(b64Path, "utf8").trim();
+          fs.writeFileSync(keystorePath, Buffer.from(b64, "base64"));
+        } catch (e) {
+          console.error("Failed to decode keystore_b64.txt:", e);
+        }
+      }
+    }
     if (fs.existsSync(keystorePath)) {
       res.setHeader("Content-Type", "application/octet-stream");
       res.setHeader("Content-Disposition", 'attachment; filename="release.keystore"');
