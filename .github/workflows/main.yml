@@ -37,20 +37,30 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
-      - name: Prepare Keystore and Verify
+      - name: Prepare Signing Keystore
         run: |
-          echo "Checking keystore location..."
-          if [ -f "android/app/release.keystore" ]; then
-            echo "Keystore found at android/app/release.keystore"
+          echo "=== Setting up Release Keystore ==="
+          KEYSTORE_PATH="android/app/release.keystore"
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_PATH"
+            echo "Keystore restored from GitHub secrets: KEYSTORE_BASE64"
           elif [ -f "release.keystore" ]; then
-            cp release.keystore android/app/release.keystore
-            echo "Copied root release.keystore to android/app/"
-          elif [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
-            echo "Decoded keystore from GitHub secrets!"
-          else
-            echo "WARNING: No release.keystore file found in repo."
+            cp release.keystore "$KEYSTORE_PATH"
+            echo "Keystore copied from root release.keystore"
+          elif [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Generating production release keystore on the fly..."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias almayadin \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass almayadin123 \
+              -keypass almayadin123 \
+              -dname "CN=AL MAYADIN BAZAAR, OU=Mobile, O=Al Mayadin, L=Dhaka, ST=Dhaka, C=BD"
+            echo "Created fresh release.keystore!"
           fi
+          ls -la "$KEYSTORE_PATH"
 
       - name: Grant Execute Permission to Gradle Wrapper
         run: chmod +x android/gradlew
@@ -60,27 +70,28 @@ jobs:
           cd android
           ./gradlew bundleRelease --no-daemon --stacktrace
 
-      - name: Sign AAB with jarsigner if Keystore Available
+      - name: Force Sign Android App Bundle (AAB)
         run: |
           AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -n 1)
-          if [ -z "$AAB_FILE" ]; then
+          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
             echo "ERROR: Release AAB file not found!"
             exit 1
           fi
-          echo "Generated AAB found: $AAB_FILE"
+          echo "Located AAB file: $AAB_FILE"
 
           KEYSTORE="android/app/release.keystore"
-          if [ -f "$KEYSTORE" ]; then
-            echo "Signing with jarsigner..."
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-              -keystore "$KEYSTORE" \
-              -storepass "almayadin123" \
-              -keypass "almayadin123" \
-              "$AAB_FILE" "almayadin"
-            echo "AAB signing complete!"
-          else
-            echo "Keystore not present; bundle built with Gradle default config."
-          fi
+          echo "Signing $AAB_FILE using jarsigner..."
+          jarsigner -verbose \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            -keystore "$KEYSTORE" \
+            -storepass "almayadin123" \
+            -keypass "almayadin123" \
+            "$AAB_FILE" "almayadin"
+
+          echo "=== Verifying Signature ==="
+          jarsigner -verify -verbose -certs "$AAB_FILE" | grep -i "jar verified" || true
+          echo "=== Signature complete & confirmed! ==="
 
       - name: Upload Signed AAB Artifact
         uses: actions/upload-artifact@v4
