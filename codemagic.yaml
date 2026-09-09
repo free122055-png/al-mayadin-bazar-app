@@ -2,7 +2,7 @@ workflows:
   android-workflow:
     name: All Mayadin Bazaar Android AAB Build
     max_build_duration: 60
-    instance_type: linux
+    instance_type: mac_mini_m2
     environment:
       node: 20
       java: 21
@@ -33,30 +33,41 @@ workflows:
         script: |
           AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -n 1)
 
-          KEYSTORE="/tmp/release.keystore"
-          ALIAS="almayadin"
-          PASS="almayadin123"
+          if [ -z "$AAB_FILE" ] || [ ! -f "$AAB_FILE" ]; then
+            echo "ERROR: Release AAB file not found!"
+            exit 1
+          fi
 
+          KEYSTORE=""
           if [ -n "$CM_KEYSTORE_PATH" ] && [ -f "$CM_KEYSTORE_PATH" ]; then
             KEYSTORE="$CM_KEYSTORE_PATH"
-            ALIAS="${CM_KEY_ALIAS:-almayadin}"
-            PASS="${CM_KEYSTORE_PASSWORD:-almayadin123}"
           elif [ -n "$CM_KEYSTORE" ]; then
-            echo "$CM_KEYSTORE" | base64 --decode > /tmp/release.keystore
             KEYSTORE="/tmp/release.keystore"
-            ALIAS="${CM_KEY_ALIAS:-almayadin}"
-            PASS="${CM_KEYSTORE_PASSWORD:-almayadin123}"
-          else
-            echo "Generating production release keystore on the fly..."
-            keytool -genkey -v -keystore "$KEYSTORE" -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "$PASS" -keypass "$PASS" -dname "CN=AlMayadin, OU=Mobile, O=AlMayadinBazaar, L=Dhaka, ST=Dhaka, C=BD"
+            echo "$CM_KEYSTORE" | base64 --decode > "$KEYSTORE"
           fi
 
-          if [ -n "$AAB_FILE" ] && [ -f "$AAB_FILE" ]; then
-            echo "Signing AAB: $AAB_FILE"
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KEYSTORE" -storepass "$PASS" -keypass "$PASS" "$AAB_FILE" "$ALIAS"
-            echo "AAB Successfully Signed!"
+          if [ -z "$KEYSTORE" ] || [ ! -f "$KEYSTORE" ]; then
+            echo "ERROR: Keystore is missing!"
+            echo "Please provide CM_KEYSTORE_PATH or CM_KEYSTORE (base64) in Codemagic environment variables."
+            exit 1
           fi
+
+          if [ -z "$CM_KEYSTORE_PASSWORD" ] || [ -z "$CM_KEY_ALIAS" ]; then
+            echo "ERROR: Required signing credentials missing!"
+            echo "Please configure CM_KEYSTORE_PASSWORD and CM_KEY_ALIAS in Codemagic secure environment variables."
+            exit 1
+          fi
+
+          KEY_PASS="${CM_KEY_PASSWORD:-$CM_KEYSTORE_PASSWORD}"
+
+          echo "Signing AAB: $AAB_FILE"
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore "$KEYSTORE" \
+            -storepass "$CM_KEYSTORE_PASSWORD" \
+            -keypass "$KEY_PASS" \
+            "$AAB_FILE" "$CM_KEY_ALIAS"
+
+          echo "AAB Successfully Signed!"
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
     publishing:
