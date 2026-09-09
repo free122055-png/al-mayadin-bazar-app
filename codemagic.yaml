@@ -1,6 +1,6 @@
 workflows:
   android-workflow:
-    name: All Mayadin Bazaar Android Build
+    name: All Mayadin Bazaar Android AAB Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -17,18 +17,17 @@ workflows:
         script: |
           npx cap sync android
           if [ -f "android/variables.gradle" ]; then
-            perl -i -pe 's/targetSdkVersion\s*=\s*\d+/targetSdkVersion = 35/g' android/variables.gradle
-            perl -i -pe 's/compileSdkVersion\s*=\s*\d+/compileSdkVersion = 35/g' android/variables.gradle
+            perl -i -pe 's/targetSdkVersion\s*=\s*\d+/targetSdkVersion = 36/g' android/variables.gradle
+            perl -i -pe 's/compileSdkVersion\s*=\s*\d+/compileSdkVersion = 36/g' android/variables.gradle
           fi
-      - name: Build Android AAB and APK
+      - name: Build Android AAB (Google Play Bundle)
         script: |
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease assembleRelease --no-daemon
-      - name: Sign Android App Bundle (AAB) and APK
+          ./gradlew bundleRelease --no-daemon
+      - name: Sign Android App Bundle (AAB)
         script: |
           AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -n 1)
-          APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -n 1)
 
           KEYSTORE="/tmp/release.keystore"
           ALIAS="almayadin"
@@ -54,15 +53,8 @@ workflows:
             jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KEYSTORE" -storepass "$PASS" -keypass "$PASS" "$AAB_FILE" "$ALIAS"
             echo "AAB Successfully Signed!"
           fi
-
-          if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
-            echo "Signing APK: $APK_FILE"
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$KEYSTORE" -storepass "$PASS" -keypass "$PASS" "$APK_FILE" "$ALIAS"
-            echo "APK Successfully Signed!"
-          fi
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
-      - android/app/build/outputs/apk/release/*.apk
     publishing:
       email:
         recipients:
