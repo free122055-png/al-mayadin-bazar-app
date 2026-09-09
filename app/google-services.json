@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "812848601619",
+    "project_id": "gen-lang-client-0777100836",
+    "storage_bucket": "gen-lang-client-0777100836.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:812848601619:android:2aafd661890c3156a23de6",
+        "android_client_info": {
+          "package_name": "com.almayadinbazar.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "812848601619-a3pe3u178qqmfn402ofdrabpg2687q4v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDc60ABMfvgtjXxRXrNFDTsQcYFM9YiwnU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "812848601619-a3pe3u178qqmfn402ofdrabpg2687q4v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:812848601619:android:bc5cc92bce1ab8e0a23de6",
+        "android_client_info": {
+          "package_name": "com.dailyinternetoffer.bd"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "812848601619-a3pe3u178qqmfn402ofdrabpg2687q4v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDc60ABMfvgtjXxRXrNFDTsQcYFM9YiwnU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "812848601619-a3pe3u178qqmfn402ofdrabpg2687q4v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,92 @@
+workflows:
+  android-workflow:
+    name: Android Workflow
+    max_build_duration: 60
+    environment:
+      node: latest
+      java: 21
+      android_signing:
+        - almayadin
+      groups:
+        - google_play_credentials # If you have these in Codemagic
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build web app
+        script: npm run build
+      - name: Initialize Capacitor Android
+        script: |
+          npx cap add android || true
+          npx cap sync android
+          node scripts/generate-assets.cjs
+          # Update SDK versions to 36
+          perl -i -pe 's/targetSdkVersion\s*=\s*\d+/targetSdkVersion = 36/g' android/variables.gradle
+          perl -i -pe 's/compileSdkVersion\s*=\s*\d+/compileSdkVersion = 36/g' android/variables.gradle
+      - name: Build Android App Bundle (.aab)
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+      - name: Sign Android App Bundle
+        script: |
+          # 1. Locate the Keystore provided by Codemagic android_signing
+          KEYSTORE_FILE=""
+          if [ -n "$CM_KEYSTORE_PATH" ] && [ -f "$CM_KEYSTORE_PATH" ]; then
+            KEYSTORE_FILE="$CM_KEYSTORE_PATH"
+          elif [ -n "$CM_KEYSTORE" ]; then
+            if [ -f "$CM_KEYSTORE" ]; then
+              KEYSTORE_FILE="$CM_KEYSTORE"
+            else
+              echo "Extracting base64 keystore from CM_KEYSTORE..."
+              echo "$CM_KEYSTORE" | base64 --decode > /tmp/codemagic_signing.keystore
+              KEYSTORE_FILE="/tmp/codemagic_signing.keystore"
+            fi
+          elif [ -f "/tmp/keystore.keystore" ]; then
+            KEYSTORE_FILE="/tmp/keystore.keystore"
+          else
+            FOUND_KEYSTORE=$(find "$HOME" /tmp "$CM_BUILD_DIR" . -maxdepth 4 -name "*.keystore" -o -name "*.jks" 2>/dev/null | head -n 1)
+            if [ -n "$FOUND_KEYSTORE" ]; then
+              KEYSTORE_FILE="$FOUND_KEYSTORE"
+            fi
+          fi
+
+          # 2. Locate the built AAB file
+          AAB_PATH=$(find android/app/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -n 1)
+          if [ -z "$AAB_PATH" ]; then
+            AAB_PATH=$(find . -name "*.aab" 2>/dev/null | head -n 1)
+          fi
+
+          # 3. Sign the AAB file using Codemagic signing credentials
+          if [ -n "$AAB_PATH" ] && [ -n "$KEYSTORE_FILE" ] && [ -f "$KEYSTORE_FILE" ]; then
+            STORE_PASS="${CM_KEYSTORE_PASSWORD:-almayadin123}"
+            KEY_PASS="${CM_KEY_PASSWORD:-almayadin123}"
+            KEY_ALIAS="${CM_KEY_ALIAS:-almayadin}"
+
+            echo "Target AAB: $AAB_PATH"
+            echo "Keystore Path: $KEYSTORE_FILE"
+            echo "Key Alias: $KEY_ALIAS"
+
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore "$KEYSTORE_FILE" \
+              -storepass "$STORE_PASS" \
+              -keypass "$KEY_PASS" \
+              "$AAB_PATH" "$KEY_ALIAS"
+
+            echo "=== Signature Verification ==="
+            jarsigner -verify "$AAB_PATH"
+            echo "Successfully signed $AAB_PATH with Codemagic signing credential: $KEY_ALIAS"
+          else
+            echo "Error: Required signing files not found!"
+            echo "AAB File: $AAB_PATH"
+            echo "Keystore File: $KEYSTORE_FILE"
+            echo "Codemagic env variables: CM_KEYSTORE_PATH=$CM_KEYSTORE_PATH, CM_KEY_ALIAS=$CM_KEY_ALIAS"
+            exit 1
+          fi
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/*.apk
+    publishing:
+      email:
+        recipients:
+          - free122055@gmail.com
