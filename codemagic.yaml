@@ -2,7 +2,7 @@ workflows:
   android-workflow:
     name: All Mayadin Bazaar Android AAB Build
     max_build_duration: 60
-    instance_type: mac_mini_m2
+    instance_type: linux
     environment:
       node: 20
       java: 21
@@ -23,11 +23,12 @@ workflows:
       - name: Build Android AAB (Google Play Bundle)
         script: |
           cd android
-          echo "Using Java version:"
+          echo "=== Java Environment ==="
           java -version
           javac -version
+          echo "========================"
           chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew bundleRelease --no-daemon --stacktrace
       - name: Sign Android App Bundle (AAB)
         script: |
           AAB_FILE=$(find android/app/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -n 1)
